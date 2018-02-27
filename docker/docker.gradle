@@ -1,0 +1,78 @@
+import com.bmuschko.gradle.docker.tasks.image.*
+import com.bmuschko.gradle.docker.tasks.container.*
+import com.bmuschko.gradle.docker.tasks.network.*
+
+apply plugin: com.bmuschko.gradle.docker.DockerRemoteApiPlugin
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath('com.bmuschko:gradle-docker-plugin:3.2.0')
+    }
+}
+
+docker {
+    url = 'tcp://127.0.0.1:2375'
+}
+
+def appFileName = 'configuration-service-0.0.1-SNAPSHOT.jar'
+def dockerContainerName = 'spring-config-service'
+def dockerContainerWorkDir = '/usr/app/'
+def dockerNetworkName = 'docker-network'
+def dockerImageExposePort = 8888
+def dockerImageTag = 'spring-config-service'
+
+task copyFilesIntoDockerContext(type: Copy) {
+    dependsOn build
+    copy {
+        from 'build/libs/' + appFileName
+        into 'docker/app/'
+    }
+    copy {
+        from 'cacerts'
+        into 'docker/app/security/'
+    }
+}
+
+task createDockerfile(type: Dockerfile) {
+    dependsOn copyFilesIntoDockerContext
+    destFile = project.file('docker/Dockerfile')
+    from 'openjdk:8-jre-alpine'
+    copyFile 'app/' + appFileName, dockerContainerWorkDir + appFileName
+    copyFile ('app/security/cacerts', '/etc/ssl/certs/java')
+    exposePort dockerImageExposePort
+    entryPoint 'java', '-jar', dockerContainerWorkDir + appFileName
+}
+
+task buildImage(type: DockerBuildImage) {
+    dependsOn createDockerfile
+    inputDir = createDockerfile.destFile.parentFile
+    tag = dockerImageTag
+}
+task createNetwork(type: DockerCreateNetwork) {
+    networkId = dockerNetworkName
+}
+
+task removeContainer(type: DockerRemoveContainer) {
+    targetContainerId { dockerContainerName }
+    force true
+    onError { exception ->
+        if (!exception.message.contains('No such container')) // ignore exception if container does not exist otherwise throw it
+            throw exception
+    }
+}
+
+task createContainer(type: DockerCreateContainer) {
+    dependsOn removeContainer, buildImage
+    targetImageId { buildImage.getImageId() }
+    portBindings = [dockerImageExposePort + ':' + dockerImageExposePort]
+    containerName = dockerContainerName
+    network dockerNetworkName
+}
+
+task startContainer(type: DockerStartContainer) {
+    dependsOn createContainer
+    targetContainerId { createContainer.getContainerId() }
+}
