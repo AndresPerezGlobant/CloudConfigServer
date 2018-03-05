@@ -40,6 +40,8 @@ task createDockerfile(type: Dockerfile) {
     dependsOn copyFilesIntoDockerContext
     destFile = project.file('docker/Dockerfile')
     from 'openjdk:8-jre-alpine'
+    runCommand 'cd usr && mkdir app && cd app && mkdir -m 777 repository'
+    runCommand 'apk update && apk upgrade && apk add git && apk add openssh'
     copyFile 'app/' + appFileName, dockerContainerWorkDir + appFileName
     copyFile ('app/security/cacerts', '/etc/ssl/certs/java')
     exposePort dockerImageExposePort
