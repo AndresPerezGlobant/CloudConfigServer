@@ -3,11 +3,11 @@ server.port: 8888
 spring.application.name: cloud_server
 
 spring.cloud.config.server.git:
-  uri: https://github.com/AndresPerezGlobant/CloudConfigProject.git
-  basedir: '/usr/app/repository'
+  uri: /srv/git/crewconfigrepository
+  cloneOnStart: true
   repos:
     cloud_client:
-      uri: https://github.com/AndresPerezGlobant/CloudConfigProject.git
+      uri: /srv/git/crewconfigrepository
       searchPaths:
         - '/cloud_client'
         - '/cloud_client/dev'

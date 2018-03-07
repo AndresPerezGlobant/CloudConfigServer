@@ -19,7 +19,6 @@ docker {
 
 def appFileName = 'configuration-service-0.0.1-SNAPSHOT.jar'
 def dockerContainerName = 'spring-config-service'
-def dockerContainerWorkDir = '/usr/app/'
 def dockerNetworkName = 'docker-network'
 def dockerImageExposePort = 8888
 def dockerImageTag = 'spring-config-service'
@@ -40,12 +39,14 @@ task createDockerfile(type: Dockerfile) {
     dependsOn copyFilesIntoDockerContext
     destFile = project.file('docker/Dockerfile')
     from 'openjdk:8-jre-alpine'
-    runCommand 'cd usr && mkdir app && cd app && mkdir -m 777 repository'
+    volume '/srv/git/ /srv/git/'
+    runCommand 'mkdir /opt && mkdir /opt/crew-config-server && mkdir ~/.ssh'
     runCommand 'apk update && apk upgrade && apk add git && apk add openssh'
-    copyFile 'app/' + appFileName, dockerContainerWorkDir + appFileName
-    copyFile ('app/security/cacerts', '/etc/ssl/certs/java')
+    runCommand 'ssh-keyscan github.com >> ~/.ssh/known_hosts && ssh-keyscan stash1-tools.swacorp.com >> ~/.ssh/known_hosts && cd ~/.ssh/ && ssh-keygen -f rsa -t rsa -N ""'
+    runCommand 'git config --global http.sslVerify false && cd /srv/git && git clone https://stash1-tools.swacorp.com/scm/crew/crewconfigrepository.git'
+    copyFile 'app/' + appFileName, 'opt/' + appFileName
     exposePort dockerImageExposePort
-    entryPoint 'java', '-jar', dockerContainerWorkDir + appFileName
+    entryPoint 'java', '-jar', 'opt/' + appFileName
 }
 
 task buildImage(type: DockerBuildImage) {
